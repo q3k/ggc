@@ -1,0 +1,325 @@
+#!/usr/grte/v4/k8-linux/bin/python2.7 -E
+# -*- python -*-
+#
+# Generated from python_stub_template.txt
+#
+# This stub's shebang is populated by blaze.
+# It ignores the magic Python environment variables (like PYTHONHOME and
+# PYTHONPATH) so that it is not affected by variables set for the target program
+# (see http://b/8133595).
+#
+# The binary that executes this stub and the one that executes the target
+# program aren't necessarily the same. If they are, its just coincidental.
+# The shebang binary is chosen by blaze to run this stub script: the
+# --python_binary flag loosely controls the shebang (however, that is subject
+# to change and shouldn't be heavily relied upon).
+# The target program's binary is chosen by the target binary to run itself.
+# The difference is because the target binary may implement running the Python
+# program in different ways (e.g., embedded within a C program, using
+# a different Python version or implementation, etc). The stub script just
+# sets up the environment so that it can run.
+#
+# Main file: google3/net/bandaid/xt_tools/csdt/csdt.py
+
+# This file MUST be kept syntax compatible with Python 2.4 through 3.latest.
+# - Use sys.stdout.write instead of print.
+# - Use sys.exc_info() to get the current exception with an except: clause.
+
+import os
+import re
+import sys
+
+
+PYTHON_BINARY = '/usr/grte/v4/k8-linux/bin/python2.7'
+PDB_ARGS = ['-m', 'pdb']
+
+# Find the real Python binary if it's not a normal absolute path
+def FindPythonBinary(module_space, new_env):
+  # This is a little peculiar. We want to support both
+  # '--python_binary=//third_party/python_runtime/...' and
+  # '--python_binary=third_party/python_runtime/...' to mean 'from
+  # perforce', and '--python_binary=/usr/grte/v2/...' (like the default) to
+  # mean 'from the system'.  Perhaps this should be pickier.
+  if PYTHON_BINARY.startswith('/') and not PYTHON_BINARY.startswith('//'):
+    return PYTHON_BINARY
+  prog = PYTHON_BINARY.lstrip('/')
+  full_path = os.path.join(module_space, 'google3', prog)
+  assert os.access(full_path, os.X_OK), full_path
+  # On Forge, the symlink forest confuses Python so much it can't find
+  # its standard library. Setting PYTHONHOME explicitly fixes that.
+  # TODO(twouters): this may be problematic when executing another python
+  # program from this one; should fix Python to not be confused instead.
+  new_env['PYTHONHOME'] = os.path.dirname(os.path.dirname(full_path))
+  return full_path
+
+
+# Find the program in the system path, return
+# the full pathname, or die
+def FindEnv(progname):
+  for path in os.environ['PATH'].split(':'):
+    fullname = os.path.join(path, progname)
+    if os.access(fullname, os.X_OK):
+      return fullname
+  raise AssertionError("Could not find an executable named '%s' in the system path" % progname)
+
+
+def MakeFullCmdline(program, args, new_env):
+  # Do this import here to avoid the overhead on normal py_binary startup.
+  import pipes
+  cmd = []
+  for k in new_env:
+    cmd.append('%s=%s' % (k, pipes.quote(new_env[k])))
+  if program != args[0]:
+    cmd.append(pipes.quote(program))
+  cmd.extend(pipes.quote(a) for a in args)
+  return ' '.join(cmd)
+
+
+def MakeGdbSetenvArgs(new_env):
+  args = []
+  for k in new_env:
+    args.append('-ex')
+    # GDB doesn't seem to accept or need any kind of escaping on the value
+    # here.
+    args.append('set env %s %s' % (k, new_env[k]))
+  return args
+
+
+def StripDelimiters(str, beg, end):
+  if str[0] == beg:
+    assert str[-1] == end
+    return (str[1:-1], True)
+  else:
+    return (str, False)
+
+
+def StripQuotes(str):
+  (str, stripped) = StripDelimiters(str, '"', '"')
+  if not stripped:
+    (str, stripped) = StripDelimiters(str, "'", "'")
+  return str
+
+
+def PrintOurUsage():
+  sys.stdout.write(
+"""Stub script %s (auto-generated). Options:
+--help  --helpshort      Show help for stub and invoke script with --help.
+--debug_binary           Run python under debugger specified by --debugger.
+--debugger=<debugger>    Debugger for --debug_binary. Default: 'gdb --args'.
+--debug_script           Run wrapped script with python debugger module (pdb).
+--show_command_and_exit  Print command which would be executed and exit.
+--show_command_and_exit=json  Print command which would be executed in json format and exit.
+These options must appear first in the command line, all others will be passed to the wrapped script.
+""" % sys.argv[0])
+
+
+def Main():
+  args = sys.argv[1:]
+
+  new_env = {}
+  debug_binary = False
+  debugger = "gdb --args"
+  debug_script = False
+  show_command_and_exit = False
+
+  while args:
+    if args[0] in ("--help", "--helpshort"):
+      PrintOurUsage()
+      sys.stdout.write("Now invoking wrapped script with --help.\n")
+      # Pass --help to wrapped script
+      break
+    if args[0] == "--debug_binary":
+      debug_binary = True
+      args = args[1:]
+      continue
+    if args[0] == "--debug_script":
+      debug_script = True
+      args = args[1:]
+      continue
+    matchobj = re.match("--show_command_and_exit(?:=(.+))?", args[0])
+    if matchobj != None:
+      if not matchobj.group(1):
+        show_command_and_exit = 'text'
+      else:
+        show_command_and_exit = StripQuotes(matchobj.group(1))
+      args = args[1:]
+      continue
+    matchobj = re.match("--debugger=(.+)", args[0])
+    if matchobj != None:
+      debugger = StripQuotes(matchobj.group(1))
+      args = args[1:]
+      continue
+    break
+
+  # allow environment to override runfiles search
+  module_space = os.environ.get('PYTHON_RUNFILES', '')
+  if not module_space:
+    # Follow symlinks, looking for my module space
+    stub_filename = os.path.abspath(sys.argv[0])
+    while True:
+      # Found it?
+      module_space = stub_filename + '.runfiles'
+      if os.path.isdir(module_space):
+        break
+
+      # Follow a symlink, try again?
+      if os.path.islink(stub_filename):
+        link = os.readlink(stub_filename)
+        # Absolutize
+        stub_filename = os.path.join(os.path.dirname(stub_filename), link)
+        continue
+
+      matchobj = re.match(r"(.*\.runfiles)/.*", os.path.abspath(sys.argv[0]))
+      if matchobj:
+        module_space = matchobj.group(1)
+        break
+
+      raise AssertionError('Cannot find .runfiles directory for %s' %
+                           sys.argv[0])
+
+  # Now look for my main python source file
+  main_filename = os.path.join(module_space, 'google3/net/bandaid/xt_tools/csdt/csdt.py')
+  main_filename_pyc = main_filename + 'c'
+  if not os.path.exists(main_filename) and os.path.exists(main_filename_pyc):
+    main_filename = main_filename_pyc
+
+  assert os.path.exists(main_filename), \
+         'Cannot exec() %r: file not found.' % main_filename
+  assert os.access(main_filename, os.R_OK), \
+         'Cannot exec() %r: file not readable.' % main_filename
+
+  python_path = os.environ.get('PYTHONPATH')
+  if not python_path:
+    new_env['PYTHONPATH'] = module_space
+  else:
+    new_env['PYTHONPATH'] = '%s:%s' % (module_space, python_path)
+  # immunize ourselves against sitecustomize
+  new_env['GOOGLEBASE'] = module_space
+
+  if 'net/bandaid/xt_tools/csdt/csdt_swigdeps.so':
+    native_code_deps_dso = os.path.join(module_space, 'google3',
+                                        'net/bandaid/xt_tools/csdt/csdt_swigdeps.so')
+    new_env['GOOGLE3_NATIVE_CODE_DEPS_DSO'] = native_code_deps_dso
+    new_env['GOOGLE3_NATIVE_CODE_DEPS_NEEDED'] = '1'
+    if ('dont_preload' == 'preload_nativedeps' or
+        os.environ.get('GOOGLE3_PRELOAD_NATIVE_CODE_DEPS')):
+      old_preload = os.environ.get('LD_PRELOAD')
+      if not old_preload:
+        new_env['LD_PRELOAD'] = native_code_deps_dso
+      else:
+        new_env['LD_PRELOAD'] = '%s %s' % (old_preload, native_code_deps_dso)
+  else:
+    new_env['GOOGLE3_NATIVE_CODE_DEPS_DSO'] = ''
+
+  program = python_program = FindPythonBinary(module_space, new_env)
+  args = [main_filename] + args
+
+  # use environmental variable to enable Python code coverage collection
+  # TODO(jwu): give a default value for 'cov_tool' via 'gconfig' settings
+  cov_tool = os.environ.get('PYTHON_COVERAGE')
+  if cov_tool:
+    # Inhibit infinite recursion:
+    del os.environ['PYTHON_COVERAGE']
+    if not os.path.exists(cov_tool):
+      raise EnvironmentError('Python coverage tool %s not found.' % cov_tool)
+    args = [program, cov_tool, 'run', '-a', '--branch'] + args
+    # coverage library expects sys.path[0] to contain the library, and replaces
+    # it with the directory of the program it starts. Our actual sys.path[0] is
+    # the runfiles directory, which must not be replaced.
+    # CoverageScript.do_execute() undoes this sys.path[0] setting.
+    #
+    # Add third_party/py/ to be the first thing sys.path in order for the
+    # coverage package to be found. The coverage entry point is
+    # coverage.coverage_main, for the coverage package to be on the path, we
+    # need to do twice the dirname.
+    cov_lib = os.path.dirname(os.path.dirname(cov_tool))
+    new_env['PYTHONPATH'] = new_env['PYTHONPATH'] + ':' + cov_lib
+
+  elif debug_binary:
+    debugger_args = debugger.split()
+    program = debugger_args[0]
+    if debugger_args[-1] == '--args':
+      # Assume the debugger is gdb and that we have to avoid starting it
+      # with new_env (for when it embeds Python it gets confused by some of
+      # the variables in it.) However, the actual program will need them, so
+      # we have to make gdb set those variables. Insert the arguments for
+      # that right before '--args'
+      debugger_args[-1:-1] = MakeGdbSetenvArgs(new_env)
+      new_env = {}
+    else:
+      sys.stderr.write("Warning: debug_binary does not end in --args; "
+                       "not fixing environment.")
+    # If pathname is not absolute, determine full path using PATH
+    if not os.path.isabs(program):
+      program = FindEnv(program)
+    command_vec = [python_program]
+    if debug_script:
+      command_vec.extend(PDB_ARGS)
+    args = [program] + debugger_args[1:] + command_vec + args
+
+  elif debug_script:
+    args = [program] + PDB_ARGS + args
+
+  elif os.environ.get('PYTHON_PYDEVD') and os.environ.get(
+      'PYTHON_PYDEVD_OPTIONS'):
+    # pydevd is a python debugger used by IntelliJ/CLion. The environment
+    # variable PYTHON_PYDEVD contains the path to the "pydevd.py" entry point.
+    # Options for "pydevd.py" are taken from the environment variable
+    # PYTHON_PYDEVD_OPTIONS, splitting on commas. These environment variables
+    # are not inherited by subprocesses. The last arguments before those for the
+    # target should be: --file path/to/actual/target.py
+    pydevd_entry = os.environ.pop('PYTHON_PYDEVD')
+    pydevd_options = os.environ.pop('PYTHON_PYDEVD_OPTIONS').split(',') + [
+        '--file'
+    ] + args
+
+    if not os.path.exists(pydevd_entry):
+      raise EnvironmentError('Pydevd entry %s not found.' % pydevd_entry)
+
+    args = [program, pydevd_entry] + pydevd_options
+
+  else:
+    args = [program] + args
+
+  if show_command_and_exit == 'json':
+    # Do this import here to avoid the overhead on normal py_binary startup.
+    import json
+    sys.stdout.write(
+        json.dumps({'program': program,
+                    'args': args,
+                    'env': new_env,
+                    'cmdline': MakeFullCmdline(program, args, new_env)},
+                   sort_keys=True)
+    )
+    sys.stdout.write('\n')
+    sys.exit(0)
+  elif show_command_and_exit == 'text':
+    sys.stdout.write(
+"""program: "%s"
+args: %s
+env: %s
+
+full commandline:
+""" % (program, args, new_env))
+    sys.stdout.write(MakeFullCmdline(program, args, new_env))
+    sys.stdout.write('\n')
+    sys.exit(0)
+  elif show_command_and_exit:
+    sys.stderr.write("Warning: show_command_and_exit does not know format %r\n"
+                     % show_command_and_exit)
+    sys.exit(0)
+
+  os.environ.update(new_env)
+
+  try:
+    sys.stdout.flush()
+    os.execv(program, args)
+  except EnvironmentError:
+    e = sys.exc_info()[1]  # Python 2.4 and 3 same source compatible syntax.
+    if not getattr(e, 'filename', None):
+      e.filename = program  # Add info to error message
+    raise
+
+
+if __name__ == '__main__':
+  Main()

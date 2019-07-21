@@ -1,0 +1,16 @@
+BUILDINFO:networking-edge-releaser@vlju16.prod.google.com:/google/src/files/244849681/depot/branches/csdt_release_branch/244847096.1/OVERLAY_READONLY/google3
+BUILDLABEL:10.00
+BUILDTOOL:Blaze, release blaze-2019.04.10-7 (mainline @242798681)
+BUILDID:923670c5-52e8-4d57-98dd-c42e66fee104
+CHANGELIST:244849681
+CLIENTNAME:build-secure-info:source-uri
+CLIENTSTATUS:1
+DEPOTPATH://depot/branches/csdt_release_branch/244847096.1/google3
+BASELINECHANGELIST:244847096
+PAROPTIONS:[]
+PLATFORM:gcc-4.X.Y-crosstool-v18-llvm-grtev4-k8
+TIMESTAMP:1556029502
+VERSIONMAP:map 0 { // }
+CITCSNAPSHOT:
+VERIFIABLE:1
+TARGET://net/bandaid/xt_tools/csdt:csdt
